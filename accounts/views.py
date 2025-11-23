@@ -3,6 +3,7 @@ from django.shortcuts import render
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 
 from .serializers import (
     RegisterSerializer,
@@ -13,6 +14,7 @@ from .serializers import (
 
 class RegisterView(GenericAPIView):
     serializer_class = RegisterSerializer
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -23,6 +25,7 @@ class RegisterView(GenericAPIView):
 
 class VerifyView(GenericAPIView):
     serializer_class = VerifySerializer
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -32,6 +35,7 @@ class VerifyView(GenericAPIView):
 
 class ResendView(GenericAPIView):
     serializer_class = ResendSerializer
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
