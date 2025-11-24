@@ -6,6 +6,10 @@ import uuid
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.contrib.auth.hashers import make_password
+from django.conf import settings
+from rest_framework_simplejwt.tokens import RefreshToken
 
 # === USER ROLE ===
 class UserRole(models.TextChoices):
@@ -53,9 +57,83 @@ class User(AbstractUser, BaseModel):
     email = models.EmailField(null=True, blank=True, unique=True)
     phone_number = models.CharField(max_length=15, blank=True, null=True, unique=True)
 
+    @property
+    def full_name(self):
+        """First name + last name birlashtirib qaytaradi."""
+        return f"{self.first_name} {self.last_name}".strip()
+
+    def check_username(self):
+        """Username validatsiyasi."""
+        if not self.username:
+            raise ValidationError("Username bo‘sh bo‘lishi mumkin emas.")
+
+        if len(self.username) < 3:
+            raise ValidationError("Username kamida 3 ta belgidan iborat bo‘lishi kerak.")
+
+        if " " in self.username:
+            raise ValidationError("Username ichida bo‘sh joy bo‘lmasligi kerak.")
+
+    def check_email(self):
+        """Email validatsiyasi."""
+        if self.auth_type == AuthType.EMAIL:
+            if not self.email:
+                raise ValidationError("Email talab qilinadi.")
+            if "@" not in self.email:
+                raise ValidationError("Email noto‘g‘ri formatda.")
+
+    def check_pass(self):
+        """Password xavfsizlik nazorati."""
+        if not self.password:
+            raise ValidationError("Parol mavjud emas.")
+
+        if len(self.password) < 6:
+            raise ValidationError("Parol kamida 6 belgidan iborat bo‘lishi kerak.")
+
+    def hashing_password(self):
+        """Password hashlangan-hashlanmaganini tekshirib hash qiladi."""
+        if not self.password.startswith("pbkdf2_"):
+            self.password = make_password(self.password)
+
+    def create_verify_code(self):
+        """User uchun verification code yaratadi."""
+        from accounts.models import UserConfirmation
+
+        return UserConfirmation.objects.create(
+            user=self,
+            confirmation_type="email_verification"
+        )
+
+    def clean(self):
+        """Advanced validation — barcha checklarni bu yerda chaqiramiz."""
+        self.check_username()
+        self.check_email()
+        self.check_pass()
+        return super().clean()
+
+    def save(self, *args, **kwargs):
+        """
+        Save override:
+        - password hashing
+        - email lower() qilib normalize
+        """
+        if self.email:
+            self.email = self.email.lower()
+
+        # Password hashing
+        self.hashing_password()
+
+        super().save(*args, **kwargs)
+
+    def token(self):
+        """JWT Access + Refresh qaytaradi."""
+        refresh = RefreshToken.for_user(self)
+        return {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh)
+        }
+
     def __str__(self):
         return self.username
-
 
 class Profile(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -101,4 +179,3 @@ class UserConfirmation(BaseModel):
     
     def __str__(self):
         return f"Confirmation for {self.user.email} - {self.confirmation_type}"
-    
