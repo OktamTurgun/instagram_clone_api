@@ -64,7 +64,6 @@ class VerifySerializer(serializers.Serializer):
         return data
 
 
-
 class ResendSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
@@ -79,3 +78,97 @@ class ResendSerializer(serializers.Serializer):
 
         return data
 
+
+class ProfileCompletionSerializer(serializers.ModelSerializer):
+    # Profile modelidagi maydonlar
+    bio = serializers.CharField(required=False, allow_blank=True)
+    website = serializers.URLField(required=False, allow_blank=True)
+    avatar = serializers.ImageField(required=False, allow_null=True)
+    location = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = (
+            "first_name",
+            "last_name",
+            "username",
+            "bio",
+            "website",
+            "avatar",
+            "location",
+        )
+
+    def validate_username(self, value):
+        if len(value) < 3:
+            raise serializers.ValidationError("Username must be at least 3 characters")
+
+        if not value.replace("_", "").isalnum():
+            raise serializers.ValidationError(
+                "Username may contain only letters, numbers and underscores"
+            )
+
+        # ✅ Current user'ni exclude qilish
+        user = self.instance
+        if User.objects.filter(username=value).exclude(id=user.id).exists():
+            raise serializers.ValidationError("This username is already taken")
+
+        return value
+
+    def update(self, user, validated_data):
+        # Userga tegishli bo'lgan maydonlar
+        user.first_name = validated_data.get("first_name", user.first_name)
+        user.last_name = validated_data.get("last_name", user.last_name)
+        user.username = validated_data.get("username", user.username)
+
+        # ✅ Profile ma'lumotlari - hasattr bilan check qilamiz
+        if not hasattr(user, 'profile'):
+            from .models import Profile
+            Profile.objects.create(user=user)
+        
+        profile = user.profile
+        profile.bio = validated_data.get("bio", profile.bio)
+        profile.website = validated_data.get("website", profile.website)
+        profile.location = validated_data.get("location", profile.location)
+
+        if "avatar" in validated_data:
+            profile.avatar = validated_data["avatar"]
+
+        profile.save()
+
+        # User statusni o'zgartiramiz
+        if user.auth_status != "completed":
+            user.auth_status = "completed"
+        user.save()
+
+        return user
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        email = data.get("email")
+        password = data.get("password")
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User with this email does not exist")
+
+        # check password
+        if not user.check_password(password):
+            raise serializers.ValidationError("Incorrect password")
+
+        # check registration flow
+        if user.auth_status == "new":
+            raise serializers.ValidationError("Email is not verified")
+
+        if user.auth_status == "code_verified":
+            raise serializers.ValidationError("Profile is not completed")
+
+        if user.auth_status != "completed":
+            raise serializers.ValidationError("User is not fully registered")
+
+        data["user"] = user
+        return data
