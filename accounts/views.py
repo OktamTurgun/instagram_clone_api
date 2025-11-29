@@ -21,8 +21,8 @@ class RegisterView(GenericAPIView):
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"message": "Verification code sent"}, status=201)
+        user = serializer.save()
+        return Response({"message": "Verification code sent"}, status=status.HTTP_201_CREATED)
 
 
 class VerifyView(GenericAPIView):
@@ -32,7 +32,20 @@ class VerifyView(GenericAPIView):
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response({"message": "Email verified!"})
+
+        user = serializer.validated_data.get("user")
+
+        # short-lived token yaratish
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+
+        # access tokenni qaytarish
+        return Response({
+            "message": "Email verified",
+            "user_id": str(user.id),
+            "access": access_token,
+            "refresh": str(refresh)
+        }, status=status.HTTP_200_OK)
 
 
 class ResendView(GenericAPIView):
@@ -46,7 +59,7 @@ class ResendView(GenericAPIView):
 
 class ProfileCompletionView(GenericAPIView):
     serializer_class = ProfileCompletionSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def put(self, request):
         email = request.data.get("email")
@@ -88,6 +101,8 @@ class LoginView(generics.GenericAPIView):
             "user": {
                 "id": user.id,
                 "email": user.email,
+                "phone_number": user.phone_number,
                 "username": user.username
             }
         }, status=status.HTTP_200_OK)
+    
