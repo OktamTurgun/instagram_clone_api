@@ -30,46 +30,24 @@ class AuthStatus(models.TextChoices):
     PHOTO_UPLOADED = 'photo_uploaded', 'Photo Uploaded'
 
 
+# ====== USER MODEL ======
 class User(AbstractUser):
-    # ✅ UUID primary key - AbstractUser'ning id'sini override qilamiz
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
-    # BaseModel'dagi maydonlar
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    # --- ROLE ---
-    user_role = models.CharField(
-        max_length=31,
-        choices=UserRole.choices,
-        default=UserRole.BASIC
-    )
 
-    # --- AUTH TYPE ---
-    auth_type = models.CharField(
-        max_length=31,
-        choices=AuthType.choices,
-        default=AuthType.EMAIL
-    )
+    user_role = models.CharField(max_length=31, choices=UserRole.choices, default=UserRole.BASIC)
+    auth_type = models.CharField(max_length=31, choices=AuthType.choices, default=AuthType.EMAIL)
+    auth_status = models.CharField(max_length=31, choices=AuthStatus.choices, default=AuthStatus.NEW)
 
-    # --- AUTH STATUS ---
-    auth_status = models.CharField(
-        max_length=31,
-        choices=AuthStatus.choices,
-        default=AuthStatus.NEW
-    )
-
-    # --- CONTACTS ---
-    email = models.EmailField(null=True, blank=True, unique=True)
-    phone_number = models.CharField(max_length=15, blank=True, null=True, unique=True)
+    email = models.EmailField(unique=True, null=True, blank=True)
+    phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
 
     @property
     def full_name(self):
-        """First name + last name birlashtirib qaytaradi."""
         return f"{self.first_name} {self.last_name}".strip()
 
     def check_username(self):
-        """Username validatsiyasi."""
         if not self.username:
             raise ValidationError("Username bo'sh bo'lishi mumkin emas.")
         if len(self.username) < 3:
@@ -77,69 +55,27 @@ class User(AbstractUser):
         if " " in self.username:
             raise ValidationError("Username ichida bo'sh joy bo'lmasligi kerak.")
 
-    def check_email(self):
-        """Email validatsiyasi."""
-        if self.auth_type == AuthType.EMAIL:
-            if not self.email:
-                raise ValidationError("Email talab qilinadi.")
-            if "@" not in self.email:
-                raise ValidationError("Email noto'g'ri formatda.")
-
-    def check_pass(self):
-        """Password xavfsizlik nazorati."""
-        if not self.password:
-            raise ValidationError("Parol mavjud emas.")
-        if len(self.password) < 6:
-            raise ValidationError("Parol kamida 6 belgidan iborat bo'lishi kerak.")
-
     def hashing_password(self):
-        """Password hashlangan-hashlanmaganini tekshirib hash qiladi."""
         if self.password and not self.password.startswith("pbkdf2_"):
             self.password = make_password(self.password)
 
-    def create_verify_code(self):
-        """User uchun verification code yaratadi."""
-        return UserConfirmation.objects.create(
-            user=self,
-            confirmation_type="email_verification"
-        )
-
     def save(self, *args, **kwargs):
-        """
-        Save override:
-        - password hashing
-        - email lower() qilib normalize
-        """
         if self.email:
             self.email = self.email.lower()
-
-        # Password hashing
         self.hashing_password()
-
         super().save(*args, **kwargs)
 
     def token(self):
-        """JWT Access + Refresh qaytaradi."""
         refresh = RefreshToken.for_user(self)
-        return {
-            "access": str(refresh.access_token),
-            "refresh": str(refresh)
-        }
+        return {"access": str(refresh.access_token), "refresh": str(refresh)}
 
     def __str__(self):
-        return self.username
+        return self.username or str(self.id)
 
-
+# ====== PROFILE ======
 class Profile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='profile'
-    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     bio = models.TextField(blank=True)
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     website = models.URLField(blank=True)
@@ -148,60 +84,37 @@ class Profile(models.Model):
     followers_count = models.PositiveIntegerField(default=0)
     following_count = models.PositiveIntegerField(default=0)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
-        return f"{self.user.username}'s profile"
+        return f"{getattr(self.user, 'username', self.user.id)}'s profile"
 
-
-# ✅ SIGNAL - Profile avtomatik yaratish
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        Profile.objects.create(user=instance)
-
-
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    """Profile save bo'lishini ta'minlaydi"""
-    if hasattr(instance, 'profile'):
-        instance.profile.save()
-
-
+# ====== USER CONFIRMATION ======
 class UserConfirmation(models.Model):
     TYPE_CHOICES = (
         ('email_verification', 'Email Verification'),
         ('phone_verification', 'Phone Verification'),
-        ('password_reset', 'Password Reset'),   
+        ('password_reset', 'Password Reset'),
     )
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='confirmations'
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='confirmations')
     confirmation_type = models.CharField(max_length=30, choices=TYPE_CHOICES)
     code = models.CharField(max_length=6, null=True, blank=True)
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     is_used = models.BooleanField(default=False)
     expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        # expires_at belgilanmagan bo'lsa — default 5 minut
         if not self.expires_at:
             self.expires_at = timezone.now() + timedelta(minutes=5)
-
-        # agar code bo'lmasa — random 6 xonali 6-digit code
-        if not self.code:
-            self.code = str(uuid.uuid4().int)[:6].zfill(6)
-        
         super().save(*args, **kwargs)
 
     def is_expired(self):
-        """Kod muddati tugagan-tugamaganligini qaytaradi."""
         return timezone.now() > self.expires_at
-    
+
     def __str__(self):
-        return f"Confirmation for {self.user.email} - {self.confirmation_type}"
+        return f"Confirmation for {self.user.email or self.user.phone_number} - {self.confirmation_type}"

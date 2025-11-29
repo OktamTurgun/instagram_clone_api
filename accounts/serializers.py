@@ -1,3 +1,4 @@
+import uuid
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import UserConfirmation
@@ -7,13 +8,21 @@ User = get_user_model()
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    contact = serializers.CharField(write_only=True)  # email yoki phone qabul qiladi
+    password = serializers.CharField(write_only=True)
+
     class Meta:
         model = User
-        fields = ("email", "password")
+        fields = ("contact", "password")
 
-    def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Email already registered")
+    def validate_contact(self, value):
+        # Email yoki phone ekanligini tekshirish
+        if "@" in value:
+            if User.objects.filter(email=value).exists():
+                raise serializers.ValidationError("Email already registered")
+        else:
+            if User.objects.filter(phone_number=value).exists():
+                raise serializers.ValidationError("Phone number already registered")
         return value
 
     def validate_password(self, value):
@@ -22,60 +31,69 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        email = validated_data["email"]
+        contact = validated_data["contact"]
         password = validated_data["password"]
+        temp_username = str(uuid.uuid4())[:12]
+
+        # Auth type aniqlash
+        auth_type = "email" if "@" in contact else "phone"
 
         user = User.objects.create_user(
-            username=email,
-            email=email,
+            username=temp_username,
+            email=contact if auth_type=="email" else None,
+            phone_number=contact if auth_type=="phone" else None,
             password=password,
-            auth_type="email",
+            auth_type=auth_type,
             auth_status="new"
         )
 
-        # confirmation yuborish
-        generate_confirmation(user, "email_verification")
-
+        # Confirmation code yuborish
+        generate_confirmation(user, f"{auth_type}_verification")
         return user
 
-
 class VerifySerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    contact = serializers.CharField()
     code = serializers.CharField(max_length=6)
 
     def validate(self, data):
-        email = data["email"]
+        contact = data["contact"]
         code = data["code"]
 
         try:
-            user = User.objects.get(email=email)
+            if "@" in contact:
+                user = User.objects.get(email=contact.lower())
+                ctype = "email_verification"
+            else:
+                user = User.objects.get(phone_number=contact)
+                ctype = "phone_verification"
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found")
 
-        ok, msg = verify_code(user, "email_verification", code)
-
+        ok, msg = verify_code(user, ctype, code)
         if not ok:
             raise serializers.ValidationError(msg)
 
-        # email tasdiqlangan
         user.auth_status = "code_verified"
         user.save()
-
+        data["user"] = user
         return data
 
 
 class ResendSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-
+    contact = serializers.CharField()
     def validate(self, data):
-        email = data["email"]
+        contact = data["contact"]
         try:
-            user = User.objects.get(email=email)
+            if "@" in contact:
+                user = User.objects.get(email=contact.lower())
+                ctype = "email_verification"
+            else:
+                user = User.objects.get(phone_number=contact)
+                ctype = "phone_verification"
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found")
 
-        resend_code(user, "email_verification")
-
+        resend_code(user, ctype)
         return data
 
 
@@ -144,15 +162,18 @@ class ProfileCompletionSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    contact = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        email = data.get("email")
+        contact = data.get("contact")
         password = data.get("password")
 
         try:
-            user = User.objects.get(email=email)
+            if "@" in contact:
+                user = User.objects.get(email=contact.lower())
+            else:
+                user = User.objects.get(phone_number=contact)
         except User.DoesNotExist:
             raise serializers.ValidationError("User with this email does not exist")
 

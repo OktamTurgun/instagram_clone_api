@@ -1,10 +1,25 @@
 from django.urls import path
-from .views import LoginView, RegisterView, VerifyView, ResendView, ProfileCompletionView
+from .views import (
+  LoginView, 
+  RegisterView, 
+  VerifyView, 
+  ResendView, 
+  ProfileCompletionView,
+)
 
 urlpatterns = [
-    path("register/", RegisterView.as_view()),
-    path("verify/", VerifyView.as_view()),
-    path("resend/", ResendView.as_view()),
-    path("complete-profile/", ProfileCompletionView.as_view()),
-    path("login/", LoginView.as_view()),
+    # 1️⃣ Ro'yxatdan o'tish
+    path("register/", RegisterView.as_view(), name='register'),
+
+    # 2️⃣ Code tasdiqlash (email yoki phone)
+    path("verify/", VerifyView.as_view(), name='verify'),
+
+    # 3️⃣ Kodni qayta yuborish
+    path("resend/", ResendView.as_view(), name='resend'),
+
+    # 4️⃣ Profilni to'ldirish (username, avatar, bio va h.k.)
+    path("complete-profile/", ProfileCompletionView.as_view(), name='complete-profile'),
+
+    # 5️⃣ Login (email yoki phone + password)
+    path("login/", LoginView.as_view(), name='login'),
 ]
