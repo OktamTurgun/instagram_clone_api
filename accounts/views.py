@@ -14,63 +14,58 @@ from .serializers import (
     LoginSerializer,
 )
 
+
 class RegisterView(GenericAPIView):
+    """User registration - email yoki phone bilan"""
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        return Response({"message": "Verification code sent"}, status=status.HTTP_201_CREATED)
+        serializer.save()
+        # to_representation ishlaydi
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class VerifyView(GenericAPIView):
+    """Verification code tasdiqlash"""
     serializer_class = VerifySerializer
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
+        
+        # User'ni context'ga qo'shish
         user = serializer.validated_data.get("user")
-
-        # short-lived token yaratish
-        refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
-
-        # access tokenni qaytarish
-        return Response({
-            "message": "Email verified",
-            "user_id": str(user.id),
-            "access": access_token,
-            "refresh": str(refresh)
-        }, status=status.HTTP_200_OK)
+        serializer.context['user'] = user
+        
+        # to_representation ishlaydi
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class ResendView(GenericAPIView):
+    """Verification code qayta yuborish"""
     serializer_class = ResendSerializer
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response({"message": "New code sent"})
+        # to_representation ishlaydi
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class ProfileCompletionView(GenericAPIView):
+    """User profilini to'ldirish"""
     serializer_class = ProfileCompletionSerializer
     permission_classes = [IsAuthenticated]
 
     def put(self, request):
-        email = request.data.get("email")
-        if not email:
-            return Response({"error": "Email is required"}, status=400)
-
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
-
+        # Authenticated user
+        user = request.user
+        
         serializer = self.get_serializer(
             user,
             data=request.data,
@@ -79,30 +74,18 @@ class ProfileCompletionView(GenericAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        return Response({"message": "Profile completed successfully"})
+        # to_representation ishlaydi
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-class LoginView(generics.GenericAPIView):
+
+class LoginView(GenericAPIView):
+    """User login - email yoki phone bilan"""
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        user = serializer.validated_data["user"]
-
-        # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
-
-        return Response({
-            "message": "Login successful",
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "phone_number": user.phone_number,
-                "username": user.username
-            }
-        }, status=status.HTTP_200_OK)
-    
+        
+        # to_representation ishlaydi
+        return Response(serializer.data, status=status.HTTP_200_OK)
