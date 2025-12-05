@@ -23,10 +23,20 @@ def generate_confirmation(user, confirmation_type):
         expires_at=timezone.now() + timedelta(minutes=5)
     )
 
-    # TODO: send via real email/SMS
-    print(f"CONFIRMATION CODE for {user.email or user.phone_number}: {code}")
+    # ✅ YANGI - Celery task orqali async email yuborish
+    from .tasks import send_verification_email
+    
+    contact = user.email if user.email else user.phone_number
+    contact_type = 'email' if user.email else 'phone'
+    
+    # Async task queue'ga qo'shish
+    send_verification_email.delay(contact, code, contact_type)
+    
+    # Development uchun console'ga ham chiqarish
+    print(f"CONFIRMATION CODE for {contact}: {code}")
 
     return confirmation
+
 
 def verify_code(user, confirmation_type, code):
     try:
