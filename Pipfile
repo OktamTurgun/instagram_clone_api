@@ -10,6 +10,9 @@ psycopg2-binary = "*"
 pillow = "*"
 python-decouple = "*"
 djangorestframework-simplejwt = "*"
+celery = {extras = ["redis"], version = "*"}
+django-celery-beat = "*"
+django-celery-results = "*"
 
 [dev-packages]
 
