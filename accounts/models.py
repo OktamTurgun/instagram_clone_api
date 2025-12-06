@@ -9,6 +9,7 @@ from django.contrib.auth.hashers import make_password
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from .utils import validate_phone_number
 
 # === USER ROLE ===
 class UserRole(models.TextChoices):
@@ -40,8 +41,24 @@ class User(AbstractUser):
     auth_type = models.CharField(max_length=31, choices=AuthType.choices, default=AuthType.EMAIL)
     auth_status = models.CharField(max_length=31, choices=AuthStatus.choices, default=AuthStatus.NEW)
 
-    email = models.EmailField(unique=True, null=True, blank=True)
-    phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    email = models.EmailField(unique=False, null=True, blank=True)
+    # YANGI - Phone field with help_text
+    phone_number = models.CharField(
+        max_length=15,  # E164 format: +XXXXXXXXXXX (max ~15 digits)
+        unique=True, 
+        null=True, 
+        blank=True,
+        help_text="Phone number in E164 format: +998901234567"
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['email'],
+                condition=models.Q(email__isnull=False),  # ✅ Faqat NULL bo'lmagan
+                name='unique_email_when_not_null'
+            ),
+    ]
 
     @property
     def full_name(self):
@@ -58,6 +75,27 @@ class User(AbstractUser):
     def hashing_password(self):
         if self.password and not self.password.startswith("pbkdf2_"):
             self.password = make_password(self.password)
+
+    # YANGI - Clean method with phone validation
+    def clean(self):
+        """Model-level validation"""
+        super().clean()
+        
+        # Phone validation
+        if self.phone_number:
+            try:
+                from .utils import validate_phone_number
+                self.phone_number = validate_phone_number(self.phone_number)
+            except ValidationError as e:
+                raise ValidationError({'phone_number': str(e)})
+        
+        # Auth type validation
+        if self.auth_type == 'email' and not self.email:
+            raise ValidationError("Email is required for email authentication")
+        
+        if self.auth_type == 'phone' and not self.phone_number:
+            raise ValidationError("Phone number is required for phone authentication")
+
 
     def save(self, *args, **kwargs):
         if self.email:
