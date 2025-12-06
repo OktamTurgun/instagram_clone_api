@@ -13,6 +13,7 @@ djangorestframework-simplejwt = "*"
 celery = {extras = ["redis"], version = "*"}
 django-celery-beat = "*"
 django-celery-results = "*"
+phonenumbers = "*"
 
 [dev-packages]
 
