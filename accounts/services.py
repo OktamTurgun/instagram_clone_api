@@ -6,14 +6,16 @@ from .models import UserConfirmation
 
 def generate_confirmation(user, confirmation_type):
     """
-    Create a new 6-digit confirmation code and invalidate previous unused codes.
+    Create confirmation code and send email/SMS
     """
-    # Old unused codes ni o'chirish
+    # Old codes ni invalid qilish
     UserConfirmation.objects.filter(
-        user=user, confirmation_type=confirmation_type, is_used=False
+        user=user, 
+        confirmation_type=confirmation_type, 
+        is_used=False
     ).update(is_used=True)
 
-    # 6 raqamli code
+    # 6-digit code
     code = str(uuid.uuid4().int)[:6].zfill(6)
 
     confirmation = UserConfirmation.objects.create(
@@ -23,17 +25,25 @@ def generate_confirmation(user, confirmation_type):
         expires_at=timezone.now() + timedelta(minutes=5)
     )
 
-    # ✅ YANGI - Celery task orqali async email yuborish
-    from .tasks import send_verification_email
+    # Task selection based on type
+    from .tasks import send_verification_email, send_password_reset_email
     
     contact = user.email if user.email else user.phone_number
     contact_type = 'email' if user.email else 'phone'
     
-    # Async task queue'ga qo'shish
-    send_verification_email.delay(contact, code, contact_type)
-    
-    # Development uchun console'ga ham chiqarish
-    print(f"CONFIRMATION CODE for {contact}: {code}")
+    if confirmation_type == 'password_reset':
+        # Password reset email with link
+        from django.conf import settings
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        reset_link = f"{frontend_url}/reset-password?token={confirmation.token}"
+        
+        send_password_reset_email.delay(contact, reset_link)
+        print(f" PASSWORD RESET CODE for {contact}: {code}")
+        print(f" RESET LINK: {reset_link}")
+    else:
+        # Verification email
+        send_verification_email.delay(contact, code, contact_type)
+        print(f" CONFIRMATION CODE for {contact}: {code}")
 
     return confirmation
 

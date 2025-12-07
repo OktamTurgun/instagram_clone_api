@@ -204,3 +204,10 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 # ===========================
 # INSTALLED APPS UPDATE
 # ===========================
+
+# ===========================
+# FRONTEND URL (for password reset links)
+# ===========================
+
+FRONTEND_URL = 'http://localhost:3000'  # Development
+# FRONTEND_URL = 'https://yourapp.com'  # Production
