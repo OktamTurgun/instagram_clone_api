@@ -12,6 +12,8 @@ from .serializers import (
     ResendSerializer,
     ProfileCompletionSerializer,
     LoginSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
 )
 
 
@@ -88,4 +90,26 @@ class LoginView(GenericAPIView):
         serializer.is_valid(raise_exception=True)
         
         # to_representation ishlaydi
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class ForgotPasswordView(GenericAPIView):
+    """ Request password reset - send code to email/phone """
+
+    serializer_class = ForgotPasswordSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class ResetPasswordView(GenericAPIView):
+    """ Reset password with verification code """
+
+    serializer_class = ResetPasswordSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

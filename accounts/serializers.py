@@ -448,3 +448,205 @@ class ProfileCompletionSerializer(serializers.ModelSerializer):
                 }
             }
         }
+    
+# === FORGOT PASSWORD SERIALIZER ===
+class ForgotPasswordSerializer(serializers.Serializer):
+    """
+    Request password reset - email yuborish
+    """
+    contact = serializers.CharField()
+
+    def validate_contact(self, value):
+        """Normalize phone if needed"""
+        if "@" in value:
+            try:
+                return validate_phone_number(value, country_code="UZ")
+            except DjangoValidationError:
+                pass
+            return value
+        
+    def validate(self, data):
+        contact = data["contact"]
+        try:
+            if "@" in contact:
+                user = User.objects.get(email=contact.lower())
+            else:
+                normalized = validate_phone_number(contact, country_code='UZ')
+                user = User.objects.get(phone_number=normalized)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+        except DjangoValidationError:
+            raise serializers.ValidationError("Invalid contact format")
+
+        # Generate password reset confirmation
+        confirmation = generate_confirmation(user, "password_reset")
+        
+        # Store confirmation in context for response
+        self.context['user'] = user
+        self.context['confirmation'] = confirmation
+        
+        return data
+
+    def to_representation(self, instance):
+        """Professional response"""
+        user = self.context.get('user')
+        confirmation = self.context.get('confirmation')
+        
+        if not user:
+            return {"success": True, "message": "Password reset code sent"}
+        
+        contact = user.email if user.email else user.phone_number
+        contact_type = "email" if user.email else "phone"
+        
+        # Generate reset link (for email)
+        reset_link = None
+        if user.email:
+            # Frontend reset page URL
+            from django.conf import settings
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+            reset_link = f"{frontend_url}/reset-password?token={confirmation.token}"
+        
+        response = {
+            "success": True,
+            "message": f"Password reset code sent to your {contact_type}",
+            "data": {
+                "contact": contact,
+                "contact_type": contact_type,
+                "code_expires_in": "5 minutes",
+                "next_step": {
+                    "action": "reset_password",
+                    "endpoint": "/api/auth/reset-password/",
+                    "required_fields": ["contact", "code", "new_password"]
+                }
+            }
+        }
+        
+        # Add reset link for email users
+        if reset_link:
+            response["data"]["reset_link"] = reset_link
+        
+        return response
+
+# ===== RESET PASSWORD SERIALIZER =====
+class ResetPasswordSerializer(serializers.Serializer):
+    """
+    Reset password with code
+    """
+    contact = serializers.CharField()
+    code = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(min_length=6, write_only=True)
+    confirm_password = serializers.CharField(min_length=6, write_only=True)
+
+    def validate_contact(self, value):
+        """Normalize phone"""
+        if "@" not in value:
+            try:
+                return validate_phone_number(value, country_code='UZ')
+            except DjangoValidationError:
+                pass
+        return value
+
+    def validate(self, data):
+        contact = data["contact"]
+        code = data["code"]
+        new_password = data["new_password"]
+        confirm_password = data["confirm_password"]
+
+        # Password match
+        if new_password != confirm_password:
+            raise serializers.ValidationError({
+                "confirm_password": "Passwords do not match"
+            })
+
+        # Find user
+        try:
+            if "@" in contact:
+                user = User.objects.get(email=contact.lower())
+            else:
+                normalized = validate_phone_number(contact, country_code='UZ')
+                user = User.objects.get(phone_number=normalized)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+        except DjangoValidationError:
+            raise serializers.ValidationError("Invalid contact format")
+
+        # Verify code
+        from .services import verify_code
+        ok, msg = verify_code(user, "password_reset", code)
+        if not ok:
+            raise serializers.ValidationError(msg)
+
+        # FIX - Update password
+        user.set_password(new_password)
+        
+        # FIX - Ensure user can login (only if profile was completed before)
+        # If user had completed registration before, keep it completed
+        # If user was in registration flow, don't change status
+        if user.auth_status == "completed":
+            # User was fully registered, keep completed
+            pass
+        # If auth_status is "new" or "code_verified", it means they never completed registration
+        # Don't auto-complete, they should still complete profile
+        
+        user.save()
+
+        # Store user for response
+        self.context['user'] = user
+        data["user"] = user
+        
+        return data
+
+    def to_representation(self, instance):
+        """Professional response"""
+        user = self.context.get('user')
+        
+        if not user:
+            user = instance.get('user')
+        
+        # Check if user needs profile completion
+        if user.auth_status != "completed":
+            return {
+                "success": True,
+                "message": "Password reset successfully! Please complete your profile to login.",
+                "data": {
+                    "user": {
+                        "id": str(user.id),
+                        "email": user.email,
+                        "phone_number": user.phone_number,
+                        "username": user.username,
+                        "auth_status": user.auth_status
+                    },
+                    "next_step": {
+                        "action": "complete_profile",
+                        "endpoint": "/api/auth/complete-profile/",
+                        "message": "Your password has been reset, but you need to complete your profile first"
+                    }
+                }
+            }
+        
+        # User fully registered - generate tokens
+        refresh = RefreshToken.for_user(user)
+        
+        return {
+            "success": True,
+            "message": "Password reset successfully! You can now login with your new password.",
+            "data": {
+                "user": {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "phone_number": user.phone_number,
+                    "username": user.username,
+                    "auth_status": user.auth_status
+                },
+                "tokens": {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "token_type": "Bearer",
+                    "expires_in": 3600
+                },
+                "next_step": {
+                    "action": "login",
+                    "message": "You can now login with your new password"
+                }
+            }
+        }
