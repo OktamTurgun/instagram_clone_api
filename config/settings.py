@@ -38,16 +38,50 @@ INSTALLED_APPS = [
     "shared",
 ]
 
+# ===========================
+# REST FRAMEWORK CONFIGURATION
+# ===========================
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+    # Default throttle classes (global)
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
     ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+    
+    # Default throttle rates (can be overridden per view)
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',           # Anonymous users: 100 req/hour
+        'user': '1000/hour',          # Authenticated users: 1000 req/hour
+        
+        # Custom scopes (per endpoint)
+        'register': '3/hour',         # Registration
+        'verify': '5/hour',           # Code verification
+        'resend': '3/hour',           # Resend code
+        'login': '5/min',            # Login attempts
+        'forgot_password': '3/hour',  # Password reset request
+        'reset_password': '5/hour',   # Password reset execution
+        
+        # General protection
+        'burst': '10/min',            # Burst protection
+        'sustained': '1000/day',      # Daily limit
+        'authenticated': '100/hour',  # Authenticated endpoints
+    },
+    
+    # Other DRF settings
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 10,
+    
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    
+    # Pagination (optional - for future use)
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+
+    # Custom exception handler for throttling
+    'EXCEPTION_HANDLER': 'accounts.views.custom_exception_handler',
 }
 
 # Simple JWT konfiguratsiyasi
