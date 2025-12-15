@@ -35,18 +35,18 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Phone validation
         try:
             # Normalize phone number
-            normalized_phone = validate_phone_number(value, country_code='UZ')
+            normalized_phone = validate_phone_number(value, default_country='UZ')
             
             # Check if already registered
             if User.objects.filter(phone_number=normalized_phone).exists():
                 raise serializers.ValidationError("Phone number already registered")
             
             # Optional: Check if Uzbekistan number
-            if not is_uzbekistan_number(normalized_phone):
-                raise serializers.ValidationError(
-                    "Only Uzbekistan phone numbers are allowed. "
-                    "Format: +998XXXXXXXXX or 998XXXXXXXXX or 9XXXXXXXX"
-                )
+            # if not is_uzbekistan_number(normalized_phone):
+            #     raise serializers.ValidationError(
+            #         "Only Uzbekistan phone numbers are allowed. "
+            #         "Format: +998XXXXXXXXX or 998XXXXXXXXX or 9XXXXXXXX"
+            #     )
             
             return normalized_phone
             

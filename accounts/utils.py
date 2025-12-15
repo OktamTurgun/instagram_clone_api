@@ -3,7 +3,7 @@ from phonenumbers import NumberParseException
 from django.core.exceptions import ValidationError
 
 
-def validate_phone_number(phone_number, country_code='UZ'):
+def validate_phone_number(phone_number, default_country='UZ'):
     """
     Phone number'ni validatsiya qiladi va normalize qiladi.
     
@@ -22,23 +22,31 @@ def validate_phone_number(phone_number, country_code='UZ'):
         validate_phone_number("998901234567")   # +998901234567
         validate_phone_number("901234567")      # +998901234567
         validate_phone_number("+998 90 123 45 67")  # +998901234567
+    
+    Universal phone number validator (international support).
+
+    Accepts:
+        +998901234567
+        +79161234567
+        +12025550123
+        901234567 (UZ fallback)
     """
+
     try:
-        # Parse qilish
-        parsed_number = phonenumbers.parse(phone_number, country_code)
-        
-        # Valid ekanligini tekshirish
+        # Agar + bilan boshlansa — international
+        if phone_number.startswith('+'):
+            parsed_number = phonenumbers.parse(phone_number, None)
+        else:
+            parsed_number = phonenumbers.parse(phone_number, default_country)
+
         if not phonenumbers.is_valid_number(parsed_number):
             raise ValidationError("Invalid phone number")
-        
-        # E164 formatga o'tkazish (+998901234567)
-        formatted_number = phonenumbers.format_number(
-            parsed_number, 
+
+        return phonenumbers.format_number(
+            parsed_number,
             phonenumbers.PhoneNumberFormat.E164
         )
-        
-        return formatted_number
-        
+
     except NumberParseException:
         raise ValidationError("Invalid phone number format")
 
