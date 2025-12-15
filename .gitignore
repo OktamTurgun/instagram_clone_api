@@ -11,6 +11,8 @@ build/
 # Virtual environment
 venv/
 env/
+.env
+.env.*
 .installdeps
 
 # Django
