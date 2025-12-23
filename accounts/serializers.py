@@ -122,7 +122,7 @@ class VerifySerializer(serializers.Serializer):
         """ Normalize phone if needed"""
         if "@" not in value:
             try:
-                return validate_phone_number(value, country_code='UZ')
+                return validate_phone_number(value, default_country='UZ')
             except DjangoValidationError:
                 pass
         return value
@@ -137,7 +137,7 @@ class VerifySerializer(serializers.Serializer):
                 ctype = "email_verification"
             else:
                 # Phone lookup with normalized format
-                normalized = validate_phone_number(contact, country_code='UZ')
+                normalized = validate_phone_number(contact, default_country='UZ')
                 user = User.objects.get(phone_number=normalized)
                 ctype = "phone_verification"
         except User.DoesNotExist:
@@ -210,7 +210,7 @@ class ResendSerializer(serializers.Serializer):
         """ Normalize phone"""
         if "@" not in value:
             try:
-                return validate_phone_number(value, country_code='UZ')
+                return validate_phone_number(value, default_country='UZ')
             except DjangoValidationError:
                 pass
         return value
@@ -222,7 +222,7 @@ class ResendSerializer(serializers.Serializer):
                 user = User.objects.get(email=contact.lower())
                 ctype = "email_verification"
             else:
-                normalized = validate_phone_number(contact, country_code='UZ')
+                normalized = validate_phone_number(contact, default_country='UZ')
                 user = User.objects.get(phone_number=normalized)
                 ctype = "phone_verification"
         except User.DoesNotExist:
@@ -277,7 +277,7 @@ class LoginSerializer(serializers.Serializer):
         """ Normalize phone"""
         if "@" not in value:
             try:
-                return validate_phone_number(value, country_code='UZ')
+                return validate_phone_number(value, default_country='UZ')
             except DjangoValidationError:
                 pass
         return value
@@ -290,7 +290,7 @@ class LoginSerializer(serializers.Serializer):
             if "@" in contact:
                 user = User.objects.get(email=contact.lower())
             else:
-                normalized = validate_phone_number(contact, country_code='UZ')
+                normalized = validate_phone_number(contact, default_country='UZ')
                 user = User.objects.get(phone_number=normalized)
         except User.DoesNotExist:
             raise serializers.ValidationError("Invalid credentials")
@@ -460,7 +460,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
         """Normalize phone if needed"""
         if "@" in value:
             try:
-                return validate_phone_number(value, country_code="UZ")
+                return validate_phone_number(value, default_country='UZ')
             except DjangoValidationError:
                 pass
             return value
@@ -471,7 +471,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
             if "@" in contact:
                 user = User.objects.get(email=contact.lower())
             else:
-                normalized = validate_phone_number(contact, country_code='UZ')
+                normalized = validate_phone_number(contact, default_country='UZ')
                 user = User.objects.get(phone_number=normalized)
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found")
@@ -541,7 +541,7 @@ class ResetPasswordSerializer(serializers.Serializer):
         """Normalize phone"""
         if "@" not in value:
             try:
-                return validate_phone_number(value, country_code='UZ')
+                return validate_phone_number(value, default_country='UZ')
             except DjangoValidationError:
                 pass
         return value
@@ -563,7 +563,7 @@ class ResetPasswordSerializer(serializers.Serializer):
             if "@" in contact:
                 user = User.objects.get(email=contact.lower())
             else:
-                normalized = validate_phone_number(contact, country_code='UZ')
+                normalized = validate_phone_number(contact, default_country='UZ')
                 user = User.objects.get(phone_number=normalized)
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found")
