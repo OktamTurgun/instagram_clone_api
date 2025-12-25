@@ -39,7 +39,7 @@ class RegisterView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        # to_representation ishlaydi
+        
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -53,11 +53,9 @@ class VerifyView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # User'ni context'ga qo'shish
         user = serializer.validated_data.get("user")
         serializer.context['user'] = user
         
-        # to_representation ishlaydi
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -65,12 +63,12 @@ class ResendView(GenericAPIView):
     """Verification code qayta yuborish"""
     serializer_class = ResendSerializer
     permission_classes = [AllowAny]
-    throttles_classes = [ResendRateThrottle]
+    throttle_classes = [ResendRateThrottle]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        # to_representation ishlaydi
+       
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -80,9 +78,7 @@ class ProfileCompletionView(GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request):
-        # Authenticated user
         user = request.user
-        
         serializer = self.get_serializer(
             user,
             data=request.data,
@@ -91,7 +87,6 @@ class ProfileCompletionView(GenericAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        # to_representation ishlaydi
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -105,7 +100,6 @@ class LoginView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # to_representation ishlaydi
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 class ForgotPasswordView(GenericAPIView):
@@ -132,9 +126,10 @@ class ResetPasswordView(GenericAPIView):
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-# Custom throttled response
 def custom_exception_handler(exc, context):
-    """Custom exception handler for better error messages"""
+    """
+    Throttling (rate limit) xatolari uchun custom response qaytaradi.
+    """
     response = exception_handler(exc, context)
 
     if response is not None and isinstance(exc, Throttled):
