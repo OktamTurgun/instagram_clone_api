@@ -3,19 +3,22 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.exceptions import ValidationError as DjangoValidationError
-from .models import UserConfirmation
 from .services import generate_confirmation, verify_code, resend_code
 from .utils import (
     validate_phone_number, 
     format_phone_display, 
     get_uzbek_operator,
-    is_uzbekistan_number
 )
 
 User = get_user_model()
 
-
+# ===================== REGISTER =====================
 class RegisterSerializer(serializers.ModelSerializer):
+    """
+    Handles user registration via email or phone number.
+    Creates a new user and sends a verification code.
+    """
+
     contact = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True)
 
@@ -26,27 +29,16 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_contact(self, value):
         """ Enhanced validation with phone number support"""
         
-        # Email validation
         if "@" in value:
             if User.objects.filter(email=value).exists():
                 raise serializers.ValidationError("Email already registered")
             return value
         
-        # Phone validation
         try:
-            # Normalize phone number
             normalized_phone = validate_phone_number(value, default_country='UZ')
             
-            # Check if already registered
             if User.objects.filter(phone_number=normalized_phone).exists():
                 raise serializers.ValidationError("Phone number already registered")
-            
-            # Optional: Check if Uzbekistan number
-            # if not is_uzbekistan_number(normalized_phone):
-            #     raise serializers.ValidationError(
-            #         "Only Uzbekistan phone numbers are allowed. "
-            #         "Format: +998XXXXXXXXX or 998XXXXXXXXX or 9XXXXXXXX"
-            #     )
             
             return normalized_phone
             
@@ -77,11 +69,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
     def to_representation(self, instance):
-        """ Enhanced with phone display format"""
+        """
+        Returns response indicating verification code delivery.
+        """
         contact = instance.email if instance.email else instance.phone_number
         contact_type = "email" if instance.email else "phone"
         
-        # Phone display format and operator
         phone_display = None
         operator = None
         if contact_type == "phone":
@@ -105,7 +98,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             }
         }
         
-        # Add phone-specific data
         if contact_type == "phone":
             response["data"]["phone_display"] = phone_display
             response["data"]["operator"] = operator
@@ -113,13 +105,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         return response
 
 
-# VerifySerializer ham phone display qo'shish
+# ===================== VERIFY =====================
 class VerifySerializer(serializers.Serializer):
+    """
+    Verifies confirmation code and issues JWT tokens.
+    """
+
     contact = serializers.CharField()
     code = serializers.CharField(max_length=6)
 
     def validate_contact(self, value):
-        """ Normalize phone if needed"""
         if "@" not in value:
             try:
                 return validate_phone_number(value, default_country='UZ')
@@ -155,7 +150,10 @@ class VerifySerializer(serializers.Serializer):
         return data
 
     def to_representation(self, instance):
-        """ Enhanced with phone display"""
+        """ 
+        Enhanced with phone display
+        Returns verification success response with JWT tokens.
+        """
         user = self.context.get("user")
         
         if not user:
@@ -165,7 +163,6 @@ class VerifySerializer(serializers.Serializer):
         contact = user.email if user.email else user.phone_number
         contact_type = "email" if user.email else "phone"
         
-        # Phone display
         phone_display = None
         if contact_type == "phone":
             phone_display = format_phone_display(contact)
@@ -202,12 +199,14 @@ class VerifySerializer(serializers.Serializer):
         return response
 
 
-# ResendSerializer ham phone normalize
+# ===================== RESEND =====================
 class ResendSerializer(serializers.Serializer):
+    """ 
+    Resend verification code to email or phone
+    """
     contact = serializers.CharField()
 
     def validate_contact(self, value):
-        """ Normalize phone"""
         if "@" not in value:
             try:
                 return validate_phone_number(value, default_country='UZ')
@@ -235,7 +234,10 @@ class ResendSerializer(serializers.Serializer):
         return data
 
     def to_representation(self, instance):
-        """ Enhanced with phone display"""
+        """ 
+            Enhanced with phone display
+            Returns confirmation of code resend.
+        """
         user = self.context.get('user')
         
         if not user:
@@ -267,14 +269,16 @@ class ResendSerializer(serializers.Serializer):
         
         return response
 
-# ===== LOGIN SERIALIZER =====
-# LoginSerializer ham phone normalize
+# ==================== LOGIN ====================
 class LoginSerializer(serializers.Serializer):
+    """
+    User login via email or phone number.
+    Returns JWT tokens upon successful authentication.
+    """
     contact = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
     def validate_contact(self, value):
-        """ Normalize phone"""
         if "@" not in value:
             try:
                 return validate_phone_number(value, default_country='UZ')
@@ -321,7 +325,10 @@ class LoginSerializer(serializers.Serializer):
         return data
 
     def to_representation(self, instance):
-        """ Enhanced with phone display"""
+        """ 
+            Enhanced with phone display
+            Returns login success response with JWT tokens.
+        """
         user = instance.get('user')
         refresh = RefreshToken.for_user(user)
         
@@ -363,8 +370,9 @@ class LoginSerializer(serializers.Serializer):
             }
         }
 
-# ===== PROFILE COMPLETION SERIALIZER =====
+# =============== PROFILE COMPLETION ================
 class ProfileCompletionSerializer(serializers.ModelSerializer):
+    """User profile completion serializer."""
     bio = serializers.CharField(required=False, allow_blank=True)
     website = serializers.URLField(required=False, allow_blank=True)
     avatar = serializers.ImageField(required=False, allow_null=True)
@@ -423,7 +431,7 @@ class ProfileCompletionSerializer(serializers.ModelSerializer):
         return user
 
     def to_representation(self, instance):
-        """ YANGI - Professional complete profile response"""
+        """ Enhanced representation after profile completion."""
         return {
             "success": True,
             "message": "Profile completed successfully! You can now use all features.",
@@ -449,16 +457,15 @@ class ProfileCompletionSerializer(serializers.ModelSerializer):
             }
         }
     
-# === FORGOT PASSWORD SERIALIZER ===
+# ==================== FORGOT PASSWORD ===================
 class ForgotPasswordSerializer(serializers.Serializer):
     """
-    Request password reset - email yuborish
+    Request password reset - email yuborish yoki phone 
     """
     contact = serializers.CharField()
 
     def validate_contact(self, value):
-        """Normalize phone if needed"""
-        if "@" in value:
+        if "@" not in value:
             try:
                 return validate_phone_number(value, default_country='UZ')
             except DjangoValidationError:
@@ -488,7 +495,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
         return data
 
     def to_representation(self, instance):
-        """Professional response"""
+        """ Professional response for forgot password request."""
         user = self.context.get('user')
         confirmation = self.context.get('confirmation')
         
@@ -521,16 +528,15 @@ class ForgotPasswordSerializer(serializers.Serializer):
             }
         }
         
-        # Add reset link for email users
         if reset_link:
             response["data"]["reset_link"] = reset_link
         
         return response
 
-# ===== RESET PASSWORD SERIALIZER =====
+# ==================== RESET PASSWORD ====================
 class ResetPasswordSerializer(serializers.Serializer):
     """
-    Reset password with code
+    Reset password with verification code
     """
     contact = serializers.CharField()
     code = serializers.CharField(max_length=6)
@@ -538,7 +544,6 @@ class ResetPasswordSerializer(serializers.Serializer):
     confirm_password = serializers.CharField(min_length=6, write_only=True)
 
     def validate_contact(self, value):
-        """Normalize phone"""
         if "@" not in value:
             try:
                 return validate_phone_number(value, default_country='UZ')
@@ -570,13 +575,11 @@ class ResetPasswordSerializer(serializers.Serializer):
         except DjangoValidationError:
             raise serializers.ValidationError("Invalid contact format")
 
-        # Verify code
         from .services import verify_code
         ok, msg = verify_code(user, "password_reset", code)
         if not ok:
             raise serializers.ValidationError(msg)
 
-        # FIX - Update password
         user.set_password(new_password)
         
         # FIX - Ensure user can login (only if profile was completed before)
@@ -597,13 +600,12 @@ class ResetPasswordSerializer(serializers.Serializer):
         return data
 
     def to_representation(self, instance):
-        """Professional response"""
+        """ Professional response after password reset."""
         user = self.context.get('user')
         
         if not user:
             user = instance.get('user')
         
-        # Check if user needs profile completion
         if user.auth_status != "completed":
             return {
                 "success": True,
@@ -624,7 +626,6 @@ class ResetPasswordSerializer(serializers.Serializer):
                 }
             }
         
-        # User fully registered - generate tokens
         refresh = RefreshToken.for_user(user)
         
         return {
