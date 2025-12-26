@@ -6,14 +6,18 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Q, Count
+from rest_framework.pagination import PageNumberPagination
 
 from .models import Follow
 from .serializers import (
     FollowActionSerializer,
+    SearchResultsSerializer,
+    SuggestedUsersSerializer,
     UserBasicSerializer,
     FollowersListSerializer,
     FollowingListSerializer,
+    UserSearchSerializer,
 )
 
 User = get_user_model()
@@ -206,5 +210,155 @@ class UserStatsView(APIView):
                 "following_count": following_count,
                 "is_following": is_following,
                 "follows_you": follows_you,
+            }
+        })
+
+# Existing imports...
+
+
+# ... existing views ...
+
+
+class UserSearchPagination(PageNumberPagination):
+    """Custom pagination for user search"""
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class UserSearchView(generics.ListAPIView):
+    """
+    Search users by username or name
+    
+    GET /api/social/users/search/?q=john
+    GET /api/social/users/search/?q=john&page=2
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSearchSerializer
+    pagination_class = UserSearchPagination
+    
+    def get_queryset(self):
+        query = self.request.query_params.get('q', '').strip()
+        
+        if not query:
+            return User.objects.none()
+        
+        # Search in username, first_name, last_name
+        queryset = User.objects.filter(
+            Q(username__icontains=query) |
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query)
+        ).exclude(
+            id=self.request.user.id  # Exclude current user
+        ).select_related('profile').distinct()
+        
+        # Order by relevance (exact matches first)
+        queryset = queryset.annotate(
+            exact_match=Count('id', filter=Q(username__iexact=query))
+        ).order_by('-exact_match', 'username')
+        
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        """Custom response format"""
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        
+        if page is not None:
+            serializer = SearchResultsSerializer(
+                page,
+                context={
+                    'request': request,
+                    'query': request.query_params.get('q', '')
+                }
+            )
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = SearchResultsSerializer(
+            queryset,
+            context={
+                'request': request,
+                'query': request.query_params.get('q', '')
+            }
+        )
+        return Response(serializer.data)
+
+
+class SuggestedUsersView(generics.ListAPIView):
+    """
+    Get suggested users (users not following)
+    
+    GET /api/social/users/suggested/
+    GET /api/social/users/suggested/?limit=10
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSearchSerializer
+    
+    def get_queryset(self):
+        user = self.request.user
+        limit = int(self.request.query_params.get('limit', 10))
+        
+        # Get users current user is already following
+        following_ids = Follow.objects.filter(
+            follower=user
+        ).values_list('following_id', flat=True)
+        
+        # Get users NOT following, exclude self
+        suggested = User.objects.exclude(
+            Q(id=user.id) | Q(id__in=following_ids)
+        ).select_related('profile')
+        
+        # Order by followers count (popular users first)
+        suggested = suggested.annotate(
+            followers=Count('followers_set')
+        ).order_by('-followers')[:limit]
+        
+        return suggested
+    
+    def list(self, request, *args, **kwargs):
+        """Custom response format"""
+        queryset = self.get_queryset()
+        serializer = SuggestedUsersSerializer(
+            queryset,
+            context={'request': request}
+        )
+        return Response(serializer.data)
+
+
+class PopularUsersView(generics.ListAPIView):
+    """
+    Get popular users (most followers)
+    
+    GET /api/social/users/popular/
+    GET /api/social/users/popular/?limit=20
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSearchSerializer
+    
+    def get_queryset(self):
+        limit = int(self.request.query_params.get('limit', 20))
+        
+        # Get users with most followers
+        popular = User.objects.exclude(
+            id=self.request.user.id
+        ).select_related('profile').annotate(
+            followers_count_db=Count('followers_set')
+        ).order_by('-followers_count_db')[:limit]
+        
+        return popular
+    
+    def list(self, request, *args, **kwargs):
+        """Custom response format"""
+        queryset = self.get_queryset()
+        serializer = SuggestedUsersSerializer(
+            queryset,
+            context={'request': request}
+        )
+        
+        return Response({
+            "success": True,
+            "data": {
+                "popular_users": serializer.data['data']['suggested_users'],
+                "count": serializer.data['data']['count']
             }
         })

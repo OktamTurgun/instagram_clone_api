@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Follow
+from django.db.models import Q, Count
 
 User = get_user_model()
 
@@ -147,5 +148,107 @@ class FollowingListSerializer(serializers.Serializer):
             "data": {
                 "following": following,
                 "count": len(following)
+            }
+        }
+
+class UserSearchSerializer(serializers.ModelSerializer):
+    """
+    Enhanced user serializer for search results
+    """
+    avatar = serializers.SerializerMethodField()
+    is_following = serializers.SerializerMethodField()
+    follows_you = serializers.SerializerMethodField()
+    mutual_followers_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = (
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'avatar',
+            'is_following',
+            'follows_you',
+            'mutual_followers_count',
+        )
+    
+    def get_avatar(self, obj):
+        """Get avatar URL"""
+        if hasattr(obj, 'profile') and obj.profile.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile.avatar.url)
+        return None
+    
+    def get_is_following(self, obj):
+        """Check if current user follows this user"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Follow.is_following(request.user, obj)
+        return False
+    
+    def get_follows_you(self, obj):
+        """Check if this user follows current user"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Follow.is_following(obj, request.user)
+        return False
+    
+    def get_mutual_followers_count(self, obj):
+        """Get count of mutual followers"""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return 0
+        
+        # Get mutual followers
+        mutual = Follow.get_mutual_followers(request.user, obj)
+        return mutual.count()
+
+
+class SearchResultsSerializer(serializers.Serializer):
+    """
+    Search results wrapper
+    """
+    def to_representation(self, instance):
+        """Format search results"""
+        request = self.context.get('request')
+        query = self.context.get('query', '')
+        
+        users = UserSearchSerializer(
+            instance,
+            many=True,
+            context={'request': request}
+        ).data
+        
+        return {
+            "success": True,
+            "data": {
+                "query": query,
+                "users": users,
+                "count": len(users)
+            }
+        }
+
+
+class SuggestedUsersSerializer(serializers.Serializer):
+    """
+    Suggested users response
+    """
+    def to_representation(self, instance):
+        """Format suggested users"""
+        request = self.context.get('request')
+        
+        users = UserSearchSerializer(
+            instance,
+            many=True,
+            context={'request': request}
+        ).data
+        
+        return {
+            "success": True,
+            "data": {
+                "suggested_users": users,
+                "count": len(users)
             }
         }

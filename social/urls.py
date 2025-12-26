@@ -5,6 +5,9 @@ from .views import (
     FollowersListView,
     FollowingListView,
     UserStatsView,
+    UserSearchView,       
+    SuggestedUsersView,   
+    PopularUsersView,      
 )
 
 urlpatterns = [
@@ -18,4 +21,9 @@ urlpatterns = [
     
     # Stats
     path('users/<uuid:user_id>/stats/', UserStatsView.as_view(), name='user-stats'),
+    
+    # NEW - Search & Suggestions
+    path('users/search/', UserSearchView.as_view(), name='user-search'),
+    path('users/suggested/', SuggestedUsersView.as_view(), name='suggested-users'),
+    path('users/popular/', PopularUsersView.as_view(), name='popular-users'),
 ]
