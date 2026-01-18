@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "accounts",
     "shared",
     "social",
+    "posts",
 ]
 
 MIDDLEWARE = [
