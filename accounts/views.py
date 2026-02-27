@@ -8,6 +8,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import exception_handler
 from rest_framework.exceptions import Throttled
 
+from rest_framework.generics import RetrieveUpdateAPIView
+from rest_framework.parsers import MultiPartParser, FormParser
+
 # Import throttles
 from .throttles import (
     RegisterRateThrottle,
@@ -145,3 +148,19 @@ def custom_exception_handler(exc, context):
         response.data = custom_response
 
     return response
+
+class ProfileUpdateView(RetrieveUpdateAPIView):
+    """
+    GET /api/auth/profile/    - Profile ko'rish
+    PUT /api/auth/profile/    - Profile yangilash (avatar + bio + location + website)
+    PATCH /api/auth/profile/  - Qisman yangilash
+    
+    MAVJUD ProfileCompletionSerializer ishlatiladi!
+    """
+    serializer_class = ProfileCompletionSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    
+    def get_object(self):
+        """Joriy user'ni qaytarish"""
+        return self.request.user
