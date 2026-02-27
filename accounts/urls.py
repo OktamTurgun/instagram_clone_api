@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
-  LoginView, 
+  LoginView,
+  ProfileUpdateView, 
   RegisterView, 
   VerifyView, 
   ResendView, 
@@ -22,6 +23,8 @@ urlpatterns = [
 
     # 4 Profilni to'ldirish (username, avatar, bio va h.k.)
     path("complete-profile/", ProfileCompletionView.as_view(), name='complete-profile'),
+
+    path('profile/', ProfileUpdateView.as_view(), name='profile'),
 
     # Authentication
     # 5 Login (email yoki phone + password)
