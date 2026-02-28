@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
   LoginView,
+  LogoutView,
   ProfileUpdateView, 
   RegisterView, 
   VerifyView, 
@@ -29,6 +30,7 @@ urlpatterns = [
     # Authentication
     # 5 Login (email yoki phone + password)
     path("login/", LoginView.as_view(), name='login'),
+    path("logout/", LogoutView.as_view(), name='logout'),
 
     # Yangi - Password reset
     path("forgot-password/", ForgotPasswordView.as_view(), name='forgot-password'),

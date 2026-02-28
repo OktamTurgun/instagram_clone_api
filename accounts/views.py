@@ -5,7 +5,7 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.views import exception_handler
+from rest_framework.views import APIView, exception_handler
 from rest_framework.exceptions import Throttled
 
 from rest_framework.generics import RetrieveUpdateAPIView
@@ -164,3 +164,35 @@ class ProfileUpdateView(RetrieveUpdateAPIView):
     def get_object(self):
         """Joriy user'ni qaytarish"""
         return self.request.user
+    
+class LogoutView(APIView):
+    """
+    POST /api/auth/logout/
+    
+    Logout user by blacklisting refresh token
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh")
+            
+            if not refresh_token:
+                return Response({
+                    "success": False,
+                    "message": "Refresh token is required"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            
+            return Response({
+                "success": True,
+                "message": "Successfully logged out"
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": "Invalid or expired token"
+            }, status=status.HTTP_400_BAD_REQUEST)
