@@ -92,7 +92,9 @@ class PostCreateView(CreateAPIView):
     permission_classes = [IsAuthenticated]
     
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        data = request.data.copy()
+        data.setlist('images', request.FILES.getlist('images'))
+        serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         post = serializer.save()
         
