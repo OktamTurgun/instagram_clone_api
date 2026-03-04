@@ -15,6 +15,7 @@ django-celery-results = "*"
 phonenumbers = "*"
 coverage = "*"
 pillow = "*"
+django-cleanup = "*"
 
 [dev-packages]
 
