@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "django_celery_beat",
     "django_celery_results",
+    "drf_spectacular",
 
     # Local apps
     "accounts",
@@ -56,6 +57,9 @@ MIDDLEWARE = [
 # REST FRAMEWORK CONFIGURATION
 # ===========================
 REST_FRAMEWORK = {
+    # Default schema class for API documentation
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema', 
+
     # Default throttle classes (global)
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
@@ -247,3 +251,29 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 FRONTEND_URL = 'http://localhost:3000'  # Development
 # FRONTEND_URL = 'https://yourapp.com'  # Production
+
+# ===========================
+# SPECTACULAR (API DOCS)
+# ===========================
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Instagram Clone API',
+    'DESCRIPTION': '''
+Instagram Clone — REST API dokumentatsiyasi.
+
+**Autentifikatsiya:** `Bearer <access_token>`
+
+Token olish uchun `/api/auth/login/` ga murojaat qiling.
+    ''',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SWAGGER_UI_SETTINGS': {
+        'persistAuthorization': True,   # Token saqlanib qoladi
+        'deepLinking': True,
+    },
+    'TAGS': [
+        {'name': 'auth',    'description': '🔐 Register, Login, Logout, Token'},
+        {'name': 'users',   'description': '👤 Profile, Avatar, Password'},
+        {'name': 'posts',   'description': '📷 Post CRUD, Feed'},
+        {'name': 'social',  'description': '👥 Follow, Like, Comment'},
+    ],
+}
