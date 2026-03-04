@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_celery_results",
     "drf_spectacular",
+    "django_cleanup.apps.CleanupConfig",
 
     # Local apps
     "accounts",
