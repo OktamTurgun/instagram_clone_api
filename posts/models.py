@@ -6,7 +6,7 @@ from django.db import models
 from django.core.validators import FileExtensionValidator
 from accounts.models import User
 from shared.models import BaseModel
-
+from shared.utils import optimize_image
 
 class Post(BaseModel):
     """
@@ -57,6 +57,13 @@ class PostImage(BaseModel):
     )
     order = models.PositiveSmallIntegerField(default=0)
     
+    # 2. Save metodini optimallashtirish uchun qo'shamiz
+    def save(self, *args, **kwargs):
+        if self.image:
+            # Rasmni siqish va WebP ga o'tkazish
+            self.image = optimize_image(self.image)
+        super().save(*args, **kwargs)
+
     class Meta:
         ordering = ['order', 'created_at']
         indexes = [

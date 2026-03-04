@@ -7,7 +7,6 @@ name = "pypi"
 django = "*"
 djangorestframework = "*"
 psycopg2-binary = "*"
-pillow = "*"
 python-decouple = "*"
 djangorestframework-simplejwt = "*"
 celery = {extras = ["redis"], version = "*"}
@@ -15,6 +14,7 @@ django-celery-beat = "*"
 django-celery-results = "*"
 phonenumbers = "*"
 coverage = "*"
+pillow = "*"
 
 [dev-packages]
 
