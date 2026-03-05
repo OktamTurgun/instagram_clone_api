@@ -40,3 +40,7 @@ htmlcov/
 .pytest_cache/
 *.cover
 .coverage.*
+
+# Local and production settings
+config/settings/local.py
+config/settings/pro.py
