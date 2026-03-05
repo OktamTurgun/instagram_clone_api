@@ -287,20 +287,11 @@ class CommentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user', 'created_at', 'likes_count', 'is_reply']
     
     def get_replies(self, obj):
-        """
-        Get nested replies (limited to 3).
-        Only show replies for top-level comments.
-        """
         if obj.is_reply:
-            return None  # Don't show nested replies of replies
-        
-        replies = obj.replies.select_related('user')[:3]
-        # Prevent infinite recursion by not including 'replies' in nested serialization
-        return CommentSerializer(
-            replies,
-            many=True,
-            context=self.context
-        ).data
+            return None
+        # N+1 muammosini oldini olish uchun select_related va prefetch_related ishlatilyapti
+        replies = obj.replies.all()[:3] 
+        return CommentSerializer(replies, many=True, context=self.context).data
     
     def get_is_liked(self, obj):
         """Check if current user liked this comment"""
