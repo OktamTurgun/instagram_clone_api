@@ -471,6 +471,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
             except DjangoValidationError:
                 pass
             return value
+        return value
         
     def validate(self, data):
         contact = data["contact"]

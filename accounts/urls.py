@@ -11,6 +11,8 @@ from .views import (
   ResetPasswordView,
 )
 
+app_name = 'accounts'
+
 urlpatterns = [
     # Registration flow
     # 1 Ro'yxatdan o'tish

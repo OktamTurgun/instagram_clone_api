@@ -12,9 +12,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
 
     # API endpoints
-    path("api/auth/",   include("accounts.urls")),
-    path("api/social/", include("social.urls")),
-    path("api/posts/",  include("posts.urls")),
+    path("api/auth/",   include("accounts.urls", namespace="accounts")),
+    path("api/social/", include("social.urls",   namespace="social")),
+    path("api/posts/",  include("posts.urls",    namespace="posts")),
 
     # OpenAPI schema
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

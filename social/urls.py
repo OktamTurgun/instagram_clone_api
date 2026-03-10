@@ -10,6 +10,8 @@ from .views import (
     PopularUsersView,      
 )
 
+app_name = 'social'
+
 urlpatterns = [
     # Follow/Unfollow
     path('users/<uuid:user_id>/follow/', FollowView.as_view(), name='follow'),
