@@ -44,3 +44,8 @@ htmlcov/
 # Local and production settings
 config/settings/local.py
 config/settings/pro.py
+
+# Ignore files related to branch cleanup
+cleanup-merged-branches.ps1
+project_structure.txt
+project_explanation.md
