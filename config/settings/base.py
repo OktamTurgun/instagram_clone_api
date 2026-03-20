@@ -1,6 +1,8 @@
+import os
 from pathlib import Path
 from decouple import config, Csv
 from datetime import timedelta
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -140,14 +142,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": config("DATABASE_NAME"),
-        "USER": config("DATABASE_USER"),
-        "PASSWORD": config("DATABASE_PASSWORD"),
-        "HOST": config("DATABASE_HOST", default="localhost"),
-        "PORT": config("DATABASE_PORT", cast=int),
-    }
+    "default": dj_database_url.config(
+        default=config("DATABASE_URL")
+    )
 }
 
 
@@ -186,8 +183,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR/'media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Static files storage (for production)
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
@@ -205,8 +203,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 # ===========================
 
 # Redis as message broker
-CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
+CELERY_BROKER_URL = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
+CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
 
 # Serialization
 CELERY_ACCEPT_CONTENT = ['json']
