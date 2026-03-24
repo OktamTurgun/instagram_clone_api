@@ -207,7 +207,7 @@ def send_password_reset_email(self, user_email, reset_link):
         raise self.retry(exc=exc, countdown=60)
 
 
-@shared_task
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_welcome_email(user_email, username):
     """
     Welcome email after profile completion

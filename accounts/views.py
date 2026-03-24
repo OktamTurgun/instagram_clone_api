@@ -36,7 +36,7 @@ class RegisterView(GenericAPIView):
     """User registration - email yoki phone bilan"""
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
-    throttle_classes = [ResetPasswordRateThrottle]
+    throttle_classes = [RegisterRateThrottle]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)

@@ -292,10 +292,10 @@ class LoginSerializer(serializers.Serializer):
 
         try:
             if "@" in contact:
-                user = User.objects.get(email=contact.lower())
+                user = User.objects.select_related('profile').get(email=contact.lower())
             else:
                 normalized = validate_phone_number(contact, default_country='UZ')
-                user = User.objects.get(phone_number=normalized)
+                user = User.objects.select_related('profile').get(phone_number=normalized)
         except User.DoesNotExist:
             raise serializers.ValidationError("Invalid credentials")
         except DjangoValidationError:
@@ -421,6 +421,7 @@ class ProfileCompletionSerializer(serializers.ModelSerializer):
 
         if "avatar" in validated_data:
             profile.avatar = validated_data["avatar"]
+            user.auth_status = "photo_uploaded"
 
         profile.save()
 
@@ -506,14 +507,6 @@ class ForgotPasswordSerializer(serializers.Serializer):
         contact = user.email if user.email else user.phone_number
         contact_type = "email" if user.email else "phone"
         
-        # Generate reset link (for email)
-        reset_link = None
-        if user.email:
-            # Frontend reset page URL
-            from django.conf import settings
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-            reset_link = f"{frontend_url}/reset-password?token={confirmation.token}"
-        
         response = {
             "success": True,
             "message": f"Password reset code sent to your {contact_type}",
@@ -528,9 +521,6 @@ class ForgotPasswordSerializer(serializers.Serializer):
                 }
             }
         }
-        
-        if reset_link:
-            response["data"]["reset_link"] = reset_link
         
         return response
 
