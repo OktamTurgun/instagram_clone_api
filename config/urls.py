@@ -8,7 +8,11 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 
+from django.views.generic import RedirectView
+
 urlpatterns = [
+    path('', RedirectView.as_view(url='/api/docs/')),
+    
     path("admin/", admin.site.urls),
 
     # API endpoints
